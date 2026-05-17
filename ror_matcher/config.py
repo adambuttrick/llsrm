@@ -12,6 +12,8 @@ from .models import (
 
 VALID_FORMATS = {"csv", "json", "jsonl"}
 VALID_ENDPOINTS = {"single_search", "multisearch"}
+VALID_SOURCES = {"ror", "marple"}
+MARPLE_DEFAULT_BASE_URL = "http://localhost:8000"
 
 
 def _parse_affiliation_field(raw) -> AffiliationFieldConfig:
@@ -50,9 +52,18 @@ def load_config(path: str | Path) -> Config:
     if output_format not in VALID_FORMATS:
         raise ValueError(f"Invalid output format: {output_format!r}. Must be one of {VALID_FORMATS}")
 
-    endpoint = q["endpoint"]
-    if endpoint not in VALID_ENDPOINTS:
-        raise ValueError(f"Invalid endpoint: {endpoint!r}. Must be one of {VALID_ENDPOINTS}")
+    source = q.get("source", "ror")
+    if source not in VALID_SOURCES:
+        raise ValueError(f"Invalid source: {source!r}. Must be one of {VALID_SOURCES}")
+
+    if source == "ror":
+        endpoint = q["endpoint"]
+        if endpoint not in VALID_ENDPOINTS:
+            raise ValueError(f"Invalid endpoint: {endpoint!r}. Must be one of {VALID_ENDPOINTS}")
+        base_url = q["base_url"]
+    else:
+        endpoint = q.get("endpoint")
+        base_url = q.get("base_url", MARPLE_DEFAULT_BASE_URL)
 
     affiliation_fields = [
         _parse_affiliation_field(af) for af in inp["affiliation_fields"]
@@ -66,8 +77,11 @@ def load_config(path: str | Path) -> Config:
             affiliation_fields=affiliation_fields,
         ),
         query=QueryConfig(
-            base_url=q["base_url"],
+            base_url=base_url,
             endpoint=endpoint,
+            source=source,
+            task=q.get("task", "affiliation"),
+            strategy=q.get("strategy", "affiliation-single-search"),
             timeout=q.get("timeout", 30),
             concurrency=q.get("concurrency", 50),
             retries=q.get("retries", 3),

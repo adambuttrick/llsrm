@@ -26,7 +26,10 @@ class InputConfig:
 @dataclass
 class QueryConfig:
     base_url: str
-    endpoint: str
+    endpoint: str | None = None
+    source: str = "ror"
+    task: str = "affiliation"
+    strategy: str = "affiliation-single-search"
     timeout: int = 30
     concurrency: int = 50
     retries: int = 3

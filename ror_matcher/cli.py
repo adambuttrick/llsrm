@@ -9,14 +9,12 @@ from . import extract, query, reconcile, throughput
 
 @click.group()
 def main():
-    """ROR Matcher - Extract, query, and reconcile affiliation data against the ROR API."""
     pass
 
 
 @main.command()
 @click.option("--config", required=True, type=click.Path(exists=True), help="Path to YAML config file")
 def extract_cmd(config):
-    """Extract unique affiliations and provenance from input file."""
     cfg = load_config(config)
     extract.run(cfg)
     click.echo("Extraction complete.")
@@ -29,7 +27,6 @@ extract_cmd.name = "extract"
 @click.option("--config", required=True, type=click.Path(exists=True), help="Path to YAML config file")
 @click.option("--resume", is_flag=True, default=False, help="Resume from checkpoint")
 def query_cmd(config, resume):
-    """Query affiliations against the ROR API."""
     cfg = load_config(config)
     asyncio.run(query.run(cfg, resume=resume))
     click.echo("Query complete.")
@@ -41,7 +38,6 @@ query_cmd.name = "query"
 @main.command()
 @click.option("--config", required=True, type=click.Path(exists=True), help="Path to YAML config file")
 def reconcile_cmd(config):
-    """Reconcile ROR matches back to source records."""
     cfg = load_config(config)
     reconcile.run(cfg)
     click.echo("Reconciliation complete.")
@@ -53,7 +49,6 @@ reconcile_cmd.name = "reconcile"
 @main.command()
 @click.option("--config", required=True, type=click.Path(exists=True), help="Path to YAML config file")
 def optimize_cmd(config):
-    """Find optimal concurrency for the target ROR API."""
     cfg = load_config(config)
 
     async def _run():
@@ -83,7 +78,6 @@ optimize_cmd.name = "optimize"
 @click.option("--optimize", is_flag=True, default=False, help="Run throughput optimization before querying")
 @click.option("--resume", is_flag=True, default=False, help="Resume query from checkpoint")
 def run_cmd(config, optimize, resume):
-    """Run the full pipeline: extract -> query -> reconcile."""
     cfg = load_config(config)
 
     click.echo("Stage 1: Extracting affiliations...")
