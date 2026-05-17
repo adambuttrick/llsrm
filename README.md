@@ -49,8 +49,9 @@ input:
     - path: authors[].affiliation[].name  # JSON path with array traversal
 
 query:
+  source: ror              # ror | marple (default: ror)
   base_url: http://localhost:9292
-  endpoint: single_search  # single_search | multisearch
+  endpoint: single_search  # ror only: single_search | multisearch
   timeout: 30
   concurrency: 50
   retries: 3
@@ -62,6 +63,19 @@ output:
   ror_id_field: ror_id
 
 working_dir: .ror_matcher
+```
+
+### Marple backend
+
+To match against a local [Marple](https://github.com/crossref/marple) instance instead of the ROR API, set `source: marple`. Marple's affiliation task also returns ROR IDs, so output is unchanged.
+
+```yaml
+query:
+  source: marple
+  # base_url defaults to http://localhost:8000
+  # task defaults to "affiliation"
+  # strategy defaults to "affiliation-single-search"
+  concurrency: 50
 ```
 
 ## Pipeline

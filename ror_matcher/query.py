@@ -12,17 +12,15 @@ from .models import Config, RorFailureRecord, RorMatchRecord, hash_affiliation
 logger = logging.getLogger(__name__)
 
 
-class RorClient:
+class _BaseClient:
     def __init__(
         self,
         base_url: str,
-        endpoint: str,
         timeout: int = 30,
         retries: int = 3,
         retry_backoff: int = 2,
     ):
         self.base_url = base_url.rstrip("/")
-        self.endpoint = endpoint
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.retries = retries
         self.retry_backoff = retry_backoff
@@ -37,23 +35,13 @@ class RorClient:
         if self._session and not self._session.closed:
             await self._session.close()
 
-    def _build_url(self, affiliation: str) -> str:
-        encoded = quote(affiliation, safe="")
-        return (
-            f"{self.base_url}/v2/organizations"
-            f"?affiliation={encoded}&{self.endpoint}"
-        )
-
-    async def query_affiliation(self, affiliation: str) -> str | None:
-        url = self._build_url(affiliation)
+    async def _get_json(self, url: str) -> dict:
         session = await self._get_session()
-
         for attempt in range(self.retries):
             try:
                 async with session.get(url) as response:
                     if response.status == 200:
-                        data = await response.json()
-                        return self._extract_chosen_ror_id(data)
+                        return await response.json()
                     elif response.status == 429:
                         retry_after = response.headers.get("Retry-After")
                         wait = (
@@ -91,6 +79,30 @@ class RorClient:
 
         raise Exception(f"Max retries ({self.retries}) exceeded")
 
+
+class RorClient(_BaseClient):
+    def __init__(
+        self,
+        base_url: str,
+        endpoint: str,
+        timeout: int = 30,
+        retries: int = 3,
+        retry_backoff: int = 2,
+    ):
+        super().__init__(base_url, timeout, retries, retry_backoff)
+        self.endpoint = endpoint
+
+    def _build_url(self, affiliation: str) -> str:
+        encoded = quote(affiliation, safe="")
+        return (
+            f"{self.base_url}/v2/organizations"
+            f"?affiliation={encoded}&{self.endpoint}"
+        )
+
+    async def query_affiliation(self, affiliation: str) -> str | None:
+        data = await self._get_json(self._build_url(affiliation))
+        return self._extract_chosen_ror_id(data)
+
     @staticmethod
     def _extract_chosen_ror_id(data: dict) -> str | None:
         for item in data.get("items", []):
@@ -98,6 +110,41 @@ class RorClient:
                 org = item.get("organization", {})
                 return org.get("id")
         return None
+
+
+class MarpleClient(_BaseClient):
+    def __init__(
+        self,
+        base_url: str,
+        task: str = "affiliation",
+        strategy: str = "affiliation-single-search",
+        timeout: int = 30,
+        retries: int = 3,
+        retry_backoff: int = 2,
+    ):
+        super().__init__(base_url, timeout, retries, retry_backoff)
+        self.task = task
+        self.strategy = strategy
+
+    def _build_url(self, affiliation: str) -> str:
+        encoded = quote(affiliation, safe="")
+        return (
+            f"{self.base_url}/match"
+            f"?task={self.task}"
+            f"&strategy={self.strategy}"
+            f"&input={encoded}"
+        )
+
+    async def query_affiliation(self, affiliation: str) -> str | None:
+        data = await self._get_json(self._build_url(affiliation))
+        return self._extract_match_id(data)
+
+    @staticmethod
+    def _extract_match_id(data: dict) -> str | None:
+        items = data.get("message", {}).get("items", [])
+        if not items:
+            return None
+        return items[0].get("id")
 
 
 class Checkpoint:
@@ -152,13 +199,23 @@ async def run(config: Config, resume: bool = False):
     matches_mode = "a" if resume and matches_path.exists() else "w"
     failures_mode = "a" if resume and failures_path.exists() else "w"
 
-    client = RorClient(
-        config.query.base_url,
-        config.query.endpoint,
-        timeout=config.query.timeout,
-        retries=config.query.retries,
-        retry_backoff=config.query.retry_backoff,
-    )
+    if config.query.source == "marple":
+        client = MarpleClient(
+            config.query.base_url,
+            task=config.query.task,
+            strategy=config.query.strategy,
+            timeout=config.query.timeout,
+            retries=config.query.retries,
+            retry_backoff=config.query.retry_backoff,
+        )
+    else:
+        client = RorClient(
+            config.query.base_url,
+            config.query.endpoint,
+            timeout=config.query.timeout,
+            retries=config.query.retries,
+            retry_backoff=config.query.retry_backoff,
+        )
 
     semaphore = asyncio.Semaphore(config.query.concurrency)
     matches_file = open(matches_path, matches_mode)

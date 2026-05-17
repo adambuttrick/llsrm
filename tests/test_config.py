@@ -34,9 +34,9 @@ output:
     assert len(config.input.affiliation_fields) == 1
     assert config.input.affiliation_fields[0].field_name == "institution"
     assert config.query.endpoint == "single_search"
-    assert config.query.concurrency == 50  # default
-    assert config.output.ror_id_field == "ror_id"  # default
-    assert config.working_dir == ".ror_matcher"  # default
+    assert config.query.concurrency == 50
+    assert config.output.ror_id_field == "ror_id"
+    assert config.working_dir == ".ror_matcher"
 
 
 def test_load_config_with_path_syntax(tmp_config):
@@ -204,6 +204,69 @@ output:
     af = config.input.affiliation_fields[0]
     assert af.path == "attributes.names[].value"
     assert af.delimiter == " | "
+
+
+def test_load_config_marple_source_defaults(tmp_config):
+    path = tmp_config("""
+input:
+  file: "data/records.csv"
+  format: csv
+  id_field: doi
+  affiliation_fields:
+    - institution
+query:
+  source: marple
+output:
+  file: "out.csv"
+  format: csv
+""")
+    config = load_config(path)
+    assert config.query.source == "marple"
+    assert config.query.base_url == "http://localhost:8000"
+    assert config.query.task == "affiliation"
+    assert config.query.strategy == "affiliation-single-search"
+    assert config.query.endpoint is None
+
+
+def test_load_config_marple_source_overrides(tmp_config):
+    path = tmp_config("""
+input:
+  file: "data/records.csv"
+  format: csv
+  id_field: doi
+  affiliation_fields:
+    - institution
+query:
+  source: marple
+  base_url: "http://marple.example:9000"
+  task: affiliation
+  strategy: affiliation-multi-search
+output:
+  file: "out.csv"
+  format: csv
+""")
+    config = load_config(path)
+    assert config.query.base_url == "http://marple.example:9000"
+    assert config.query.strategy == "affiliation-multi-search"
+
+
+def test_load_config_invalid_source(tmp_config):
+    path = tmp_config("""
+input:
+  file: "data/records.csv"
+  format: csv
+  id_field: doi
+  affiliation_fields:
+    - institution
+query:
+  source: openalex
+  base_url: "http://localhost:8000"
+output:
+  file: "out.csv"
+  format: csv
+""")
+    with pytest.raises(ValueError, match="source"):
+        load_config(path)
 
 
 def test_load_config_plain_string_has_no_delimiter(tmp_config):

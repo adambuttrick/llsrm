@@ -159,12 +159,10 @@ def test_extract_jsonl_creates_provenance_with_path_indices(jsonl_config):
     working = Path(jsonl_config.working_dir)
     records = [json.loads(l) for l in (working / "provenance.jsonl").read_text().strip().split("\n")]
     assert len(records) == 3
-    # First record: creator 0, affiliation 0
     assert records[0]["record_id"] == "10.1234/abc"
     assert records[0]["affiliation"] == "University of Oxford"
     assert records[0]["path_indices"] == [0, 0]
     assert records[0]["row_index"] == 0
-    # Second record: creator 0, affiliation 1
     assert records[1]["path_indices"] == [0, 1]
     assert records[1]["affiliation"] == "Dept of Physics"
 

@@ -83,7 +83,7 @@ async def find_optimal_concurrency(
 
     result = await test_concurrency_level(base_url, floor, timeout)
     if not result.passed:
-        return 1  # Even the floor fails
+        return 1
 
     while low <= high:
         mid = (low + high) // 2
